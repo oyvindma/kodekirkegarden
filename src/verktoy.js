@@ -46,6 +46,14 @@ function sokIRepo({ monster, regex = false, maks_treff = MAKS_TREFF } = {}) {
   }
 
   const grense = Math.min(Math.max(1, Number(maks_treff) || MAKS_TREFF), 200);
+  const { treff, totalt } = skann(test, grense);
+
+  if (totalt === 0) return `Ingen treff på «${monster}».`;
+  return formater(treff, totalt);
+}
+
+// Går gjennom alle linjer i repoet og samler de som test() godtar.
+function skann(test, grense) {
   const treff = [];
   let totalt = 0;
   for (const fil of alleFiler(REPO)) {
@@ -56,10 +64,79 @@ function sokIRepo({ monster, regex = false, maks_treff = MAKS_TREFF } = {}) {
       if (treff.length < grense) treff.push(`${path.relative(REPO, fil)}:${i + 1}: ${linje.trim()}`);
     });
   }
+  return { treff, totalt };
+}
 
-  if (totalt === 0) return `Ingen treff på «${monster}».`;
+function formater(treff, totalt) {
   const hale = totalt > treff.length ? `\n… ${totalt - treff.length} treff til. Snevre inn søket.` : '';
   return treff.join('\n') + hale;
+}
+
+// Gjør om en sti fra modellen til en absolutt sti som garantert ligger i REPO.
+function repoSti(fil) {
+  if (typeof fil !== 'string' || !fil.trim()) {
+    throw new Error('Mangler «fil». Send f.eks. {"fil": "src/server.js"}.');
+  }
+  const full = path.resolve(REPO, fil);
+  const rel = path.relative(REPO, full);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) throw new Error('Fila må ligge i hjemsokt-repo.');
+  return full;
+}
+
+function lesFil({ fil } = {}) {
+  const full = repoSti(fil);
+  if (!fs.existsSync(full)) {
+    throw new Error(`Fant ikke «${fil}». Stien må være relativ til roten av hjemsokt-repo. Bruk sok_i_repo for å finne riktig sti.`);
+  }
+  if (!fs.statSync(full).isFile()) {
+    const innhold = fs.readdirSync(full).join(', ');
+    throw new Error(`«${fil}» er en mappe, ikke en fil. Innhold: ${innhold}`);
+  }
+  return fs.readFileSync(full, 'utf8')
+    .split('\n')
+    .map((linje, i) => `${i + 1}: ${linje}`)
+    .join('\n');
+}
+
+const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+function finnReferanser({ navn } = {}) {
+  if (typeof navn !== 'string' || !navn.trim()) {
+    throw new Error('Mangler «navn». Send f.eks. {"navn": "beregnRabatt"}.');
+  }
+  const n = escapeRegex(navn.trim());
+  // Hele ord, men uten \b: navn som «@scope/pakke» starter ikke på et ordtegn.
+  const bruk = new RegExp(`(?<![\\w$])${n}(?![\\w$])`);
+  const definisjon = new RegExp(
+    `\\b(function\\*?|class|const|let|var)\\s+${n}(?![\\w$])` + // function navn, const navn =
+    `|^\\s*(async\\s+)?${n}\\s*\\([^)]*\\)\\s*\\{` + // metode: navn(...) {
+    `|^\\s*"${n}"\\s*:`, // "navn": i package.json
+  );
+  const test = (linje) => bruk.test(linje) && !definisjon.test(linje);
+
+  const { treff, totalt } = skann(test, MAKS_TREFF);
+  if (totalt === 0) {
+    return `Ingen referanser til «${navn}» utenom definisjonen. Sjekk likevel indirekte bruk ` +
+      '(strenger i config, dynamisk import, npm-scripts) med sok_i_repo før du konkluderer.';
+  }
+  return formater(treff, totalt);
+}
+
+function hentGitHistorikk({ fil } = {}) {
+  repoSti(fil); // samme sti-validering som les_fil
+  const logg = JSON.parse(fs.readFileSync(GIT_LOGG, 'utf8')).filer;
+  const nøkkel = path.relative(REPO, path.resolve(REPO, fil)).split(path.sep).join('/');
+  const commits = logg[nøkkel];
+  if (!commits) {
+    const navnet = path.basename(nøkkel);
+    const lignende = Object.keys(logg).filter((f) => path.basename(f) === navnet || f.includes(navnet));
+    const tips = lignende.length ? ` Mente du: ${lignende.join(', ')}?` : ` Filer i loggen: ${Object.keys(logg).join(', ')}`;
+    throw new Error(`Ingen git-historikk for «${fil}».${tips}`);
+  }
+  return [...commits]
+    .sort((a, b) => b.dato.localeCompare(a.dato))
+    .map((c) => `${c.dato} ${c.hash} ${c.forfatter}: ${c.melding}`)
+    .join('\n');
 }
 
 export const verktøy = [
@@ -99,9 +176,7 @@ export const verktøy = [
         required: ['fil'],
       },
     },
-    // TODO: path.join(REPO, fil), sjekk at resultatet fortsatt ligger under REPO
-    // (ingen ../-triks), les med fs.readFileSync og prefiks hver linje med nummer.
-    kjør: null,
+    kjør: async (input) => lesFil(input),
   },
   {
     definisjon: {
@@ -119,9 +194,7 @@ export const verktøy = [
         required: ['navn'],
       },
     },
-    // TODO: gjenbruk sokIRepo med en regex som \bnavn\b, og filtrer bort linjer
-    // som definerer navnet (function navn, const navn =, "navn": i package.json).
-    kjør: null,
+    kjør: async (input) => finnReferanser(input),
   },
   {
     definisjon: {
@@ -137,8 +210,6 @@ export const verktøy = [
         required: ['fil'],
       },
     },
-    // TODO: JSON.parse(fs.readFileSync(GIT_LOGG, 'utf8')).filer[fil]. Gi en
-    // forståelig feilmelding (throw new Error) hvis fila ikke finnes i loggen.
-    kjør: null,
+    kjør: async (input) => hentGitHistorikk(input),
   },
 ];
