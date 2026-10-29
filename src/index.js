@@ -9,7 +9,7 @@ try {
 }
 
 if (!process.env.ANTHROPIC_API_KEY) {
-  console.error('Mangler ANTHROPIC_API_KEY. Kopier .env.example til .env og lim inn nøkkelen.');
+  console.error('Mangler ANTHROPIC_API_KEY. Kopier .env til .env og lim inn nøkkelen.');
   process.exit(1);
 }
 

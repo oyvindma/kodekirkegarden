@@ -8,7 +8,7 @@ Lag en agent som graver i et hjemsøkt repo, finner død kode og skriver nekrolo
 
 ```bash
 npm install
-cp .env.example .env        # lim inn API-nøkkelen fra Hekserådet
+cp .env .env        # lim inn API-nøkkelen fra Hekserådet
 npm start                   # kjører eksempeloppgaven
 npm start -- "Hvilke pakker i package.json brukes ikke?"
 ```
@@ -63,6 +63,20 @@ Dataene er vanlige filer: `hjemsokt-repo/` er bare tekst, og `data/git-logg.json
 ```bash
 npm install
 cp .env.example .env     # lim inn ANTHROPIC_API_KEY (valgfritt for demo-modus)
+npm run web              # http://127.0.0.1:3000
+```
+
+`server.js` serverer `public/index.html` og streamer agentens arbeid som Server-Sent Events
+(`/api/run?modus=live|demo`). Hver fil i `hjemsokt-repo/` tegnes som en gravstein, og agenten går
+til filene den leser. Agenten leverer funn med verktøyet `registrer_funn`, og frontend begraver
+eller lar stå. Demo-modus spiller av et manus uten AI (verktøyene kjører likevel mot ekte kode).
+`npm start` kjører fortsatt agenten i terminalen som før.
+
+## Web-visning (backend + animasjon)
+
+```bash
+npm install
+cp .env .env     # lim inn ANTHROPIC_API_KEY (valgfritt for demo-modus)
 npm run web              # http://127.0.0.1:3000
 ```
 
