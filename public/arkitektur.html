@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kodekirkegården – arkitektur</title>
+<style>
+  :root { --bg:#0b0816; --panel:#14102a; --panel2:#1b1538; --line:#3a2f6b; --ink:#e8e2ff; --dim:#9a90c8; --acc:#ff9a2e; --ok:#6ee7a0; --bad:#ff6b7a; --blue:#9bd1ff; --yel:#ffd27a; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; overflow:hidden; }
+  code, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  code { background:#241c4a; padding:1px 6px; border-radius:4px; font-size:.9em; color:var(--yel); }
+  #deck { height:100%; position:relative; }
+  .slide { position:absolute; inset:0; padding:44px 64px 84px; display:none; flex-direction:column; overflow:auto; background:radial-gradient(1200px 600px at 80% -10%, #1d1545 0%, transparent 60%), var(--bg); }
+  .slide.on { display:flex; animation:in .35s ease; }
+  .slide > * { flex-shrink:0; }
+  @keyframes in { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+  h1 { font-size:54px; margin:0 0 8px; color:var(--acc); letter-spacing:.5px; }
+  h2 { font-size:32px; margin:0 0 4px; color:var(--acc); }
+  .sub { color:var(--dim); margin:0 0 22px; font-size:17px; max-width:900px; }
+  .num { color:var(--dim); font-family:ui-monospace,monospace; font-size:13px; letter-spacing:2px; text-transform:uppercase; }
+  .center { justify-content:center; align-items:flex-start; }
+  .row { display:flex; gap:18px; flex-wrap:wrap; }
+  .col { flex:1 1 320px; min-width:280px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 18px; }
+  .card h3 { margin:0 0 6px; font-size:17px; color:var(--ink); }
+  .card p { margin:4px 0; color:#cfc8f5; font-size:14.5px; }
+  .tag { display:inline-block; font-size:11px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); color:var(--dim); font-family:ui-monospace,monospace; margin-left:6px; vertical-align:middle; }
+  .tag.ok { color:var(--ok); border-color:var(--ok); } .tag.warn { color:var(--yel); border-color:var(--yel); }
+  ul { margin:6px 0 0; padding-left:20px; color:#cfc8f5; } li { margin:5px 0; }
+  table { border-collapse:collapse; width:100%; font-size:14px; } th, td { text-align:left; padding:7px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--dim); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:1px; }
+  svg { width:100%; height:auto; display:block; }
+  svg text { font-family: ui-monospace, "SF Mono", Menlo, monospace; fill:var(--ink); }
+  .box { fill:var(--panel2); stroke:var(--line); stroke-width:1.5; } .boxA { fill:#2a1d12; stroke:var(--acc); stroke-width:1.5; }
+  .boxG { fill:#10241c; stroke:var(--ok); stroke-width:1.5; } .boxB { fill:#10202c; stroke:var(--blue); stroke-width:1.5; }
+  .arr { stroke:var(--dim); stroke-width:2; fill:none; marker-end:url(#ah); } .arrA { stroke:var(--acc); stroke-width:2; fill:none; marker-end:url(#ahA); }
+  .arrB { stroke:var(--blue); stroke-width:2; fill:none; marker-end:url(#ahB); } .dash { stroke-dasharray:6 5; }
+  .lbl { font-size:12px; fill:var(--dim); } .t1 { font-size:14px; font-weight:600; } .t2 { font-size:12px; fill:#cfc8f5; }
+  .flow { stroke-dasharray:6 8; animation:flow 1.2s linear infinite; } @keyframes flow { to { stroke-dashoffset:-28; } }
+  .stream { background:#0e0a20; border:1px solid var(--line); border-radius:10px; padding:12px 16px; font:13px/1.7 ui-monospace,monospace; }
+  .stream .k { color:var(--blue);} .stream .f { color:var(--ok);} .stream .t { color:var(--yel);} .stream .d { color:var(--dim);}
+  #nav { position:fixed; left:0; right:0; bottom:0; height:64px; display:flex; align-items:center; gap:14px; padding:0 24px; background:linear-gradient(transparent, #0b0816 40%); z-index:5; }
+  #nav button { background:#1f1840; color:var(--ink); border:1px solid var(--line); border-radius:8px; padding:8px 16px; font:inherit; cursor:pointer; }
+  #nav button:hover { border-color:var(--acc); } #dots { display:flex; gap:7px; flex:1; justify-content:center; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#2b2350; cursor:pointer; } .dot.on { background:var(--acc); }
+  #count { color:var(--dim); font:13px ui-monospace,monospace; min-width:54px; text-align:right; }
+  .big { font-size:20px; color:#d8d1fa; max-width:880px; }
+  .pill { display:inline-block; padding:3px 12px; border-radius:20px; background:#241c4a; margin:3px 4px 3px 0; font-size:14px; }
+  @media print { html, body { overflow:visible; height:auto; } .slide { position:static; display:flex !important; page-break-after:always; min-height:100vh; } #nav { display:none; } }
+</style>
+</head>
+<body>
+<div id="deck">
+
+<!-- 1 ─────────────────────────────────────────────────────────── -->
+<section class="slide center on">
+  <div class="num">Arkitektur</div>
+  <h1>🪦 Kodekirkegården</h1>
+  <p class="big">En AI-agent som graver i et ekte repo, og en animasjon som viser hva den gjør, mens den gjør det.</p>
+  <div style="margin-top:18px">
+    <span class="pill">Node.js, ingen rammeverk</span><span class="pill">Claude API</span><span class="pill">Server-Sent Events</span><span class="pill">Canvas, ingen byggesteg</span>
+  </div>
+  <p class="sub" style="margin-top:26px">Bruk pilene ← → eller mellomrom for å bla.</p>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">01 · Oversikt</div>
+  <h2>Stort bilde</h2>
+  <p class="sub">Modellen rører aldri disken selv. Den kan bare <i>be om</i> verktøy, og <code>verktoy.js</code> er det eneste som leser filer.</p>
+  <svg viewBox="0 0 1000 400" role="img" aria-label="Arkitekturoversikt">
+    <defs>
+      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#9a90c8"/></marker>
+      <marker id="ahA" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#ff9a2e"/></marker>
+      <marker id="ahB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#9bd1ff"/></marker>
+    </defs>
+    <!-- browser -->
+    <rect class="box" x="10" y="20" width="270" height="360" rx="14"/>
+    <text class="t1" x="30" y="50">Nettleser</text><text class="lbl" x="30" y="68">public/index.html</text>
+    <rect class="boxB" x="30" y="85" width="230" height="70" rx="8"/><text class="t1" x="45" y="112">Canvas</text><text class="t2" x="45" y="132">1 gravstein = 1 fil</text>
+    <rect class="boxB" x="30" y="170" width="230" height="70" rx="8"/><text class="t1" x="45" y="197">Hendelseskø</text><text class="t2" x="45" y="217">én hendelse om gangen</text>
+    <rect class="boxB" x="30" y="255" width="230" height="70" rx="8"/><text class="t1" x="45" y="282">Sidepanel</text><text class="t2" x="45" y="302">logg + siste verktøysvar</text>
+    <!-- server -->
+    <rect class="box" x="370" y="20" width="620" height="360" rx="14"/>
+    <text class="t1" x="390" y="50">Node-prosess</text><text class="lbl" x="390" y="68">npm run web</text>
+    <rect class="boxA" x="390" y="85" width="190" height="86" rx="8"/><text class="t1" x="405" y="112">server.js</text><text class="t2" x="405" y="132">HTTP + SSE</text><text class="t2" x="405" y="150">/api/status · repo · run</text>
+    <rect class="boxA" x="610" y="85" width="190" height="86" rx="8"/><text class="t1" x="625" y="112">agent.js</text><text class="t2" x="625" y="132">agentløkka</text><text class="t2" x="625" y="150">kjørAgent(emit)</text>
+    <rect class="boxG" x="830" y="85" width="140" height="86" rx="8"/><text class="t1" x="845" y="112">Modell</text><text class="t2" x="845" y="132">live: Claude</text><text class="t2" x="845" y="150">demo: manus</text>
+    <rect class="box" x="610" y="215" width="360" height="140" rx="8"/><text class="t1" x="625" y="242">verktoy.js</text>
+    <text class="t2" x="625" y="266">sok_i_repo · les_fil</text><text class="t2" x="625" y="286">finn_referanser · hent_git_historikk</text><text class="t2" x="625" y="306">registrer_funn</text><text class="lbl" x="625" y="336">eneste kode som leser disk</text>
+    <rect class="box" x="390" y="215" width="190" height="140" rx="8"/><text class="t1" x="405" y="242">Data</text><text class="t2" x="405" y="266">hjemsokt-repo/</text><text class="t2" x="405" y="286">data/git-logg.json</text><text class="lbl" x="405" y="336">leses, aldri endres</text>
+    <!-- arrows -->
+    <path class="arrB flow" d="M370 128 L262 190"/><text class="lbl" x="310" y="150">SSE</text>
+    <path class="arrB dash" d="M262 215 L388 118" style="display:none"/>
+    <path class="arr" d="M582 128 L608 128"/><path class="arr" d="M800 128 L828 128"/><path class="arrA" d="M705 173 L705 213"/>
+    <path class="arr" d="M608 285 L582 285"/>
+    <path class="arr dash" d="M260 100 L388 100" style="display:none"/>
+  </svg>
+  <div class="row" style="margin-top:6px">
+    <div class="card col"><h3>Én retning av gangen</h3><p>Nettleseren starter en kjøring med ett GET-kall. Etter det går alt <b>server → nettleser</b> som en strøm av hendelser.</p></div>
+    <div class="card col"><h3>Samme agent overalt</h3><p><code>npm start</code> (terminal) og <code>npm run web</code> bruker samme <code>kjørAgent</code>. Bare <code>emit</code> er ulik.</p></div>
+  </div>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">02 · Agentløkka</div>
+  <h2>Hele «agent-greia» er en løkke</h2>
+  <p class="sub">Spør modellen, kjør verktøyene den ber om, send resultatene tilbake, gjenta til modellen svarer uten å be om verktøy.</p>
+  <svg viewBox="0 0 1000 330">
+    <rect class="boxG" x="20" y="130" width="170" height="70" rx="10"/><text class="t1" x="40" y="160">Oppgave</text><text class="t2" x="40" y="180">messages = [user]</text>
+    <rect class="boxA" x="260" y="130" width="190" height="70" rx="10"/><text class="t1" x="280" y="160">Spør modellen</text><text class="t2" x="280" y="180">modell({tools, messages})</text>
+    <polygon points="560,110 640,165 560,220 480,165" class="box"/><text class="t1" x="526" y="162">tool_use?</text><text class="lbl" x="536" y="180">stop_reason</text>
+    <rect class="boxG" x="460" y="10" width="200" height="56" rx="10"/><text class="t1" x="480" y="35">emit(ferdig)</text><text class="t2" x="480" y="53">end_turn · refusal · max</text>
+    <rect class="boxB" x="720" y="125" width="220" height="80" rx="10"/><text class="t1" x="740" y="153">Kjør verktøy</text><text class="t2" x="740" y="173">emit(kall) → kjør()</text><text class="t2" x="740" y="189">emit(svar) [+ funn]</text>
+    <rect class="boxB" x="720" y="245" width="220" height="70" rx="10"/><text class="t1" x="740" y="273">Legg til resultat</text><text class="t2" x="740" y="293">alle tool_result i én melding</text>
+    <path class="arr" d="M190 165 L258 165"/><path class="arr" d="M450 165 L478 165"/>
+    <path class="arrA" d="M640 165 L718 165"/><text class="lbl" x="668" y="157">ja</text>
+    <path class="arr" d="M830 205 L830 243"/>
+    <path class="arrA" d="M720 280 L355 280 L355 202"/><text class="lbl" x="500" y="272">neste runde</text>
+    <path class="arr" d="M560 110 L560 68"/><text class="lbl" x="572" y="94">nei</text>
+  </svg>
+  <div class="row" style="margin-top:6px">
+    <div class="card col"><h3>Feil er ikke slutten</h3><p>Kaster et verktøy, går feilmeldingen tilbake som <code>tool_result</code> med <code>is_error</code>. Modellen kan rette seg (f.eks. feil filsti).</p></div>
+    <div class="card col"><h3>Kostnadstak</h3><p><code>MAX_ITERASJONER</code> (standard 40) stopper en agent som går i ring. Lukker du nettleseren, avbrytes den via <code>AbortSignal</code>.</p></div>
+    <div class="card col"><h3>Funn leveres underveis</h3><p><code>registrer_funn</code> kalles med <code>begrav</code> eller <code>la_staa</code>, nekrolog og begrunnelse.</p></div>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">03 · Verktøyene</div>
+  <h2>Fem verktøy, ett sted</h2>
+  <p class="sub">Alle ligger i <code>src/verktoy.js</code>. Beskrivelsen i hver definisjon er det modellen leser for å vite når verktøyet skal brukes.</p>
+  <div class="row">
+    <div class="card col"><h3>🔍 sok_i_repo <span class="tag">tekst/regex</span></h3><p>Søker i alle filer. Svarer «fil:linje: tekst», maks 50 treff. Fyller <code>filer[]</code> i hendelsen, så gravene lyser opp.</p></div>
+    <div class="card col"><h3>📖 les_fil <span class="tag">fil</span></h3><p>Leser én fil med linjenumre. Stien valideres mot <code>../</code>. Agenten <b>går</b> til gravsteinen.</p></div>
+    <div class="card col"><h3>🔗 finn_referanser <span class="tag">navn</span></h3><p>Hele ord, utenom definisjonen. Null treff sier fra at indirekte bruk (config, dynamisk import) må sjekkes.</p></div>
+  </div>
+  <div class="row" style="margin-top:14px">
+    <div class="card col"><h3>🕰 hent_git_historikk <span class="tag">fil</span></h3><p>Dato, forfatter og melding fra <code>data/git-logg.json</code>. Gir «sist rørt av Mona i 2021».</p></div>
+    <div class="card col"><h3>📜 registrer_funn <span class="tag ok">leveranse</span></h3><p>Agentens svar til systemet: <code>fil, tittel, dom, nekrolog, begrunnelse</code>. Frontend begraver eller tenner lykt.</p></div>
+    <div class="card col"><h3>Tryggheter</h3><ul><li>Stier valideres med <code>path.relative</code></li><li>Treff og tekst er begrenset</li><li>Verktøy kan ikke skrive til disk</li></ul></div>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">04 · Backend → frontend</div>
+  <h2>API og hendelser</h2>
+  <p class="sub">Én <code>GET /api/run</code> gir en åpen strøm. Hver hendelse er én linje <code>data: {json}</code>.</p>
+  <div class="row">
+    <div class="col" style="flex:1.1">
+      <table>
+        <tr><th>Hendelse</th><th>Betyr</th></tr>
+        <tr><td><code>start</code></td><td>modus, modell, oppgave</td></tr>
+        <tr><td><code>tanke</code></td><td>modellens tekst mellom kall</td></tr>
+        <tr><td><code>kall</code></td><td>agenten ber om et verktøy</td></tr>
+        <tr><td><code>svar</code></td><td>verktøyets resultat + <code>filer[]</code></td></tr>
+        <tr><td><code>funn</code></td><td>ferdig vurdering: begrav / la_staa</td></tr>
+        <tr><td><code>ferdig</code></td><td>siste hendelse (stopp-årsak)</td></tr>
+        <tr><td><code>feil</code></td><td>uventet feil</td></tr>
+      </table>
+    </div>
+    <div class="col">
+      <div class="stream">
+        <div class="d">// ett funn, sett fra nettleseren</div>
+        <div><span class="t">tanke</span> «Mistenkelig: legacyCsv.js …»</div>
+        <div><span class="k">kall</span>&nbsp; sok_i_repo → <span class="f">svar</span></div>
+        <div><span class="k">kall</span>&nbsp; les_fil → <span class="f">svar</span></div>
+        <div><span class="k">kall</span>&nbsp; finn_referanser → <span class="f">svar</span></div>
+        <div><span class="k">kall</span>&nbsp; hent_git_historikk → <span class="f">svar</span></div>
+        <div><span class="k">kall</span>&nbsp; registrer_funn → <span class="f">svar</span></div>
+        <div><span style="color:var(--acc)">funn</span> { dom: "begrav", nekrolog … }</div>
+      </div>
+      <table style="margin-top:12px">
+        <tr><th>Endepunkt</th><th>Gjør</th></tr>
+        <tr><td><code>/api/status</code></td><td>finnes nøkkel? modell, maks runder</td></tr>
+        <tr><td><code>/api/repo</code></td><td>filene som tegnes som graver</td></tr>
+        <tr><td><code>/api/run</code></td><td>SSE-strøm, én kjøring om gangen</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">05 · Sekvens</div>
+  <h2>Fra klikk til animasjon</h2>
+  <svg viewBox="0 0 1000 440">
+    <g class="lbl">
+      <rect class="box" x="30" y="10" width="170" height="36" rx="8"/><text class="t1" x="62" y="33">Nettleser</text>
+      <rect class="box" x="290" y="10" width="170" height="36" rx="8"/><text class="t1" x="332" y="33">server.js</text>
+      <rect class="box" x="550" y="10" width="170" height="36" rx="8"/><text class="t1" x="570" y="33">agent + verktøy</text>
+      <rect class="box" x="810" y="10" width="160" height="36" rx="8"/><text class="t1" x="855" y="33">Claude</text>
+    </g>
+    <g stroke="#3a2f6b" stroke-width="1.5" stroke-dasharray="4 5"><line x1="115" y1="46" x2="115" y2="430"/><line x1="375" y1="46" x2="375" y2="430"/><line x1="635" y1="46" x2="635" y2="430"/><line x1="890" y1="46" x2="890" y2="430"/></g>
+    <path class="arrB" d="M115 78 L372 78"/><text class="lbl" x="130" y="72">GET /api/run?modus=live</text>
+    <text class="t2" x="385" y="100">lås: én kjøring om gangen</text>
+    <path class="arr" d="M375 112 L632 112"/><text class="lbl" x="400" y="130">kjørAgent(emit, signal)</text>
+    <path class="arr" d="M635 150 L887 150"/><text class="lbl" x="670" y="144">messages.create(tools)</text>
+    <path class="arrA" d="M890 176 L638 176"/><text class="lbl" x="700" y="170">tool_use</text>
+    <path class="arrB flow" d="M375 206 L118 206" /><text class="lbl" x="150" y="200">data: kall</text>
+    <text class="t2" x="650" y="214">kjør() leser disk</text>
+    <path class="arrB flow" d="M375 236 L118 236"/><text class="lbl" x="150" y="230">data: svar</text>
+    <path class="arr" d="M635 262 L887 262"/><text class="lbl" x="670" y="256">tool_result tilbake</text>
+    <text class="lbl" x="440" y="288">… løkka gjentas …</text>
+    <path class="arrB flow" d="M375 312 L118 312"/><text class="lbl" x="150" y="306">data: funn</text>
+    <path class="arrA" d="M890 340 L638 340"/><text class="lbl" x="700" y="334">end_turn</text>
+    <path class="arrB flow" d="M375 366 L118 366"/><text class="lbl" x="150" y="360">data: ferdig</text>
+    <path class="arr dash" d="M115 404 L372 404"/><text class="lbl" x="130" y="398">Stopp / lukk fane</text>
+    <path class="arr dash" d="M375 418 L632 418"/><text class="lbl" x="400" y="414">abort() → signal.aborted</text>
+  </svg>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">06 · Synk</div>
+  <h2>Backend og animasjon går i hvert sitt tempo</h2>
+  <p class="sub">Agenten kan levere svar på millisekunder, men det tar sekunder å gå over kirkegården. Derfor kjører frontend en hendelseskø.</p>
+  <svg viewBox="0 0 1000 200">
+    <rect class="boxA" x="10" y="60" width="200" height="80" rx="10"/><text class="t1" x="28" y="92">Backend</text><text class="t2" x="28" y="112">raskt, uavhengig</text>
+    <path class="arrB flow" d="M210 100 L268 100"/>
+    <rect class="box" x="270" y="40" width="250" height="120" rx="10"/><text class="t1" x="288" y="68">Kø (FIFO)</text>
+    <g><rect class="boxB" x="288" y="84" width="40" height="30" rx="5"/><rect class="boxB" x="334" y="84" width="40" height="30" rx="5"/><rect class="boxB" x="380" y="84" width="40" height="30" rx="5"/><rect class="boxB" x="426" y="84" width="40" height="30" rx="5"/><text class="lbl" x="288" y="136">events venter her</text></g>
+    <path class="arr" d="M520 100 L578 100"/>
+    <rect class="boxG" x="580" y="40" width="410" height="120" rx="10"/><text class="t1" x="598" y="68">Animasjon: cur</text>
+    <text class="t2" x="598" y="96">walk → arrived → dwell → end</text><text class="t2" x="598" y="118">neste hendelse først når forrige er ferdig</text>
+  </svg>
+  <table style="margin-top:6px">
+    <tr><th>Hendelse</th><th>Animasjon</th><th>Varighet (×1)</th></tr>
+    <tr><td><code>tanke</code></td><td>taleboble over agenten + loggføring</td><td>1,1–3 s</td></tr>
+    <tr><td><code>kall</code> med <code>fil</code></td><td>agenten <b>går</b> til gravsteinen</td><td>gange + 0,5 s</td></tr>
+    <tr><td><code>kall</code> uten fil</td><td>ring-puls rundt agenten</td><td>0,5 s</td></tr>
+    <tr><td><code>svar</code></td><td>resultat i panelet; treff-filer lyser opp</td><td>0,8–1,2 s</td></tr>
+    <tr><td><code>funn</code></td><td>gå til steinen → gravhaug eller grønn lykt</td><td>gange + 1,8 s</td></tr>
+    <tr><td><code>ferdig</code></td><td>obduksjonsrapport</td><td>1,2 s</td></tr>
+  </table>
+  <div class="row" style="margin-top:12px">
+    <div class="card col"><h3>Rekkefølgen er garantert</h3><p>Tellere og logg følger animasjonen, ikke nettverket. Fart ×1/×2/×4 kjører flere <code>update()</code> per bilde.</p></div>
+    <div class="card col"><h3>Pause og Stopp</h3><p>Pause fryser bare animasjonen, backend fyller køen videre. Stopp lukker <code>EventSource</code> og avbryter agenten og kostnaden.</p></div>
+  </div>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">07 · Frontend</div>
+  <h2>Hvordan kirkegården tegnes</h2>
+  <p class="sub">Verden bygges av de faktiske filene i repoet. Ingen bilder, alt tegnes på ett canvas.</p>
+  <svg viewBox="0 0 1000 150">
+    <rect class="boxB" x="10" y="40" width="200" height="70" rx="10"/><text class="t1" x="28" y="70">GET /api/repo</text><text class="t2" x="28" y="90">22 filer</text>
+    <path class="arr" d="M210 75 L258 75"/>
+    <rect class="box" x="260" y="40" width="230" height="70" rx="10"/><text class="t1" x="278" y="70">buildWorld()</text><text class="t2" x="278" y="90">mappe = tomt, fil = stein</text>
+    <path class="arr" d="M490 75 L538 75"/>
+    <rect class="box" x="540" y="40" width="200" height="70" rx="10"/><text class="t1" x="558" y="70">update(dt)</text><text class="t2" x="558" y="90">kø, gange, partikler</text>
+    <path class="arr" d="M740 75 L788 75"/>
+    <rect class="boxA" x="790" y="40" width="200" height="70" rx="10"/><text class="t1" x="808" y="70">draw()</text><text class="t2" x="808" y="90">hver ramme</text>
+  </svg>
+  <div class="row" style="margin-top:8px">
+    <div class="card col"><h3>Gravsteinens tilstand</h3><ul><li><b>Grå stein:</b> ikke vurdert ennå</li><li><b>Gravhaug med blomst:</b> funn med <code>begrav</code></li><li><b>Grønt lys:</b> funn med <code>la_staa</code></li><li><b>Ikoner under navnet:</b> verktøy brukt på filen</li></ul></div>
+    <div class="card col"><h3>Lag i hver ramme</h3><ul><li>Bakgrunn, måne, stjerner</li><li>Soner (mapper) og gravsteiner</li><li>Agent, taleboble, puls-ringer</li><li>Tåke og flaggermus</li><li>Mørke med «hull» rundt lykta</li></ul></div>
+    <div class="card col"><h3>Sikkerhet i UI</h3><p>All tekst fra filer og modell går gjennom HTML-escape før den vises, så innhold ikke kan injisere HTML.</p></div>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────────────────── -->
+<section class="slide">
+  <div class="num">08 · Drift</div>
+  <h2>Live eller demo, og hva som er trygt</h2>
+  <div class="row" style="margin-top:8px">
+    <div class="col" style="flex:1.2">
+      <table>
+        <tr><th></th><th>Live</th><th>Demo</th></tr>
+        <tr><td>«Modellen»</td><td>Claude via SDK</td><td><code>demo.js</code>: manus</td></tr>
+        <tr><td>Verktøy</td><td>ekte</td><td><b>ekte</b></td></tr>
+        <tr><td>Funn</td><td>modellens egne</td><td>faste (<code>demo-funn.json</code>)</td></tr>
+        <tr><td>Krever</td><td><code>ANTHROPIC_API_KEY</code></td><td>ingenting</td></tr>
+        <tr><td>Merkelapp</td><td><span class="tag ok">LIVE · Claude</span></td><td><span class="tag warn">DEMO · ikke AI</span></td></tr>
+      </table>
+      <p class="sub" style="margin-top:12px">Begge kjører gjennom samme <code>kjørAgent</code>, <code>emit</code> og SSE. Frontend vet ikke forskjellen.</p>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Sikkerhet og grenser</h3>
+        <ul>
+          <li>Lytter bare på <code>127.0.0.1</code>. Nøkkelen sendes aldri til nettleseren.</li>
+          <li>Én kjøring om gangen (HTTP 429 ellers).</li>
+          <li>Stier valideres mot <code>../</code> og søskenmapper.</li>
+          <li><code>MAX_ITERASJONER</code> og avbrudd ved lukket fane begrenser kostnad.</li>
+          <li>Agentens vurderinger må kontrolleres av et menneske før noe slettes.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:14px"><h3>Utvid</h3>
+    <p><b>Nytt verktøy:</b> legg <code>{ definisjon, kjør }</code> i <code>verktøy</code>. &nbsp; <b>Ny hendelse:</b> <code>emit({type})</code> i <code>agent.js</code> + <code>case</code> i <code>begin()</code>. &nbsp; <b>Annet repo:</b> endre <code>REPO</code> og <code>GIT_LOGG</code>.</p>
+  </div>
+</section>
+
+</div>
+
+<div id="nav">
+  <button id="prev">← Forrige</button>
+  <div id="dots"></div>
+  <span id="count"></span>
+  <button id="next">Neste →</button>
+</div>
+
+<script>
+const slides = [...document.querySelectorAll('.slide')];
+const dots = document.getElementById('dots');
+let i = Math.max(0, Math.min(slides.length - 1, (parseInt(location.hash.slice(1), 10) || 1) - 1));
+slides.forEach((_, k) => { const d = document.createElement('div'); d.className = 'dot'; d.onclick = () => go(k); dots.appendChild(d); });
+function go(n) {
+  i = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s, k) => s.classList.toggle('on', k === i));
+  [...dots.children].forEach((d, k) => d.classList.toggle('on', k === i));
+  document.getElementById('count').textContent = `${i + 1} / ${slides.length}`;
+  history.replaceState(null, '', '#' + (i + 1));
+}
+document.getElementById('prev').onclick = () => go(i - 1);
+document.getElementById('next').onclick = () => go(i + 1);
+addEventListener('keydown', (e) => {
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(i + 1); }
+  if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(i - 1); }
+  if (e.key === 'Home') go(0); if (e.key === 'End') go(slides.length - 1);
+});
+go(i);
+</script>
+</body>
+</html>
