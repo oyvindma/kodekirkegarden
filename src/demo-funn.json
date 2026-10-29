@@ -1,0 +1,119 @@
+[
+  {
+    "fil": "package.json",
+    "tittel": "request · lodash · sinon · moment",
+    "dom": "begrav",
+    "nekrolog": "Her hviler request, lodash og sinon. Kjøpt inn til en SMS-tjeneste og en statistikkfunksjon som aldri så dagens lys, og en testhjelper ingen rørte. Moment følger etter når legacyCsv.js er lagt i jorda.",
+    "begrunnelse": "Ingen aktive importer. request ble lagt til for SMS-varsling som aldri kom. moment forsvinner sammen med legacyCsv.js.",
+    "sok": "moment",
+    "navn": "moment"
+  },
+  {
+    "fil": "src/utils/legacyCsv.js",
+    "tittel": "legacyCsv.js",
+    "dom": "begrav",
+    "nekrolog": "Her hviler legacyCsv.js (2020–2021). Ble erstattet av lønnsintegrasjonen og merket «utgående» av Mona, som sluttet samme år. Ingen har kalt den siden. Latin1 til det siste.",
+    "begrunnelse": "Merket utgående i 2021, erstattet av lønnsintegrasjonen, null kall og null dynamiske treff.",
+    "sok": "eksporterCsv",
+    "navn": "eksporterCsv"
+  },
+  {
+    "fil": "src/utils/dato.js",
+    "tittel": "erHelligdag + HELLIGDAGER_2021",
+    "dom": "begrav",
+    "nekrolog": "Her hviler erHelligdag (2021–2021). Kjente seks helligdager, alle i 2021. Ble aldri eksportert, så ingen fikk høre om dem. Formaterte-dato-gammel hviler i kommentarfeltet ved siden av.",
+    "begrunnelse": "Ikke eksportert, null kall, og lista er hardkodet til et år som er over. Samme gjelder utkommentert formaterDatoGammel.",
+    "sok": "erHelligdag",
+    "navn": "erHelligdag"
+  },
+  {
+    "fil": "src/services/bookingService.js",
+    "tittel": "beregnRabatt",
+    "dom": "begrav",
+    "nekrolog": "Her hviler beregnRabatt. Hun lovet 15 % til eksterne kunder, men avtalen ble aldri signert. Ingen kalte henne, og hun var ikke engang eksportert. Sjekk med Jonas om flagget skal følge henne.",
+    "begrunnelse": "Uten kall og uten eksport. Flagget i config er nyere, så si fra til den som la det til, men funksjonen er død.",
+    "sok": "beregnRabatt",
+    "navn": "beregnRabatt"
+  },
+  {
+    "fil": "src/services/bookingService.js",
+    "tittel": "grupperPerKontor (utkommentert)",
+    "dom": "begrav",
+    "nekrolog": "Her hviler grupperPerKontor og statistikkPerKontor, begge i en blokkommentar. Aldri aktive i dagens versjon. Skulle noen savne dem finnes de i git.",
+    "begrunnelse": "Utkommentert kode er den tryggeste døde koden som finnes. Git husker den for deg.",
+    "sok": "grupperPerKontor",
+    "navn": "grupperPerKontor"
+  },
+  {
+    "fil": "src/services/bookingService.js",
+    "tittel": "formaterBookingForLonn",
+    "dom": "la_staa",
+    "nekrolog": "Denne er ikke død. Den bor i et annet repo og sender regninger hver måned. Den står på gravplassen fordi søket vårt ikke rekker lønnsintegrasjonen.",
+    "begrunnelse": "Eksportert og dokumentert, brukes av et eksternt repo (lonn-integrasjon). Ingen treff i dette repoet betyr ikke at den er død.",
+    "sok": "lonn-integrasjon",
+    "navn": "formaterBookingForLonn"
+  },
+  {
+    "fil": "src/jobber/rydding.js",
+    "tittel": "rydding.js",
+    "dom": "la_staa",
+    "nekrolog": "Denne lever fortsatt. Hver natt klokka 03 rydder den opp etter alle andre, og ingen har skrevet «require» til den. Den kalles via en streng i config.",
+    "begrunnelse": "Ingen import, men lastes via config-streng («fil.funksjon») av jobbrunneren. Statisk søk etter importer finner den ikke.",
+    "sok": "ryddGamleBookinger",
+    "navn": "ryddGamleBookinger"
+  },
+  {
+    "fil": "src/plugins/teams.js",
+    "tittel": "teams.js",
+    "dom": "la_staa",
+    "nekrolog": "Denne lever. Den ble lagt til så sent som i 2025, og lastes inn med dynamisk import fra navnet i config. Den dør bare hvis noen fjerner «teams» fra lista.",
+    "begrunnelse": "Dynamisk import via config.plugins. Ingen statisk import, men aktiv og nylig endret (2025).",
+    "sok": "plugins",
+    "navn": "teams"
+  },
+  {
+    "fil": "src/kalender/nyKalender.js",
+    "tittel": "nyKalender.js",
+    "dom": "la_staa",
+    "nekrolog": "Her ligger nyKalender.js, på vei ned i jorda siden 2021, men fortsatt importert av en rute. Et flagg som aldri er skrudd på er et valg noen må ta, ikke noe en graver kan ta for dem.",
+    "begrunnelse": "Importert fra routes/rom.js og gjemt bak et flagg. Kan sikkert fjernes, men det er en produktbeslutning, ikke en opprydding. Spør eieren.",
+    "sok": "nyKalender",
+    "navn": "lagUkevisning"
+  },
+  {
+    "fil": "src/server.js",
+    "tittel": "v1-ruter (utkommentert)",
+    "dom": "begrav",
+    "nekrolog": "Her hviler /api/v1/bookinger og /api/v1/rom. Døde da mobilappen flyttet til v2 i mars 2021. Filene er borte, bare to kommentarlinjer står igjen og minnes dem.",
+    "begrunnelse": "Rutefilene finnes ikke, og kommentaren sier selv hvorfor og når de døde.",
+    "sok": "V1",
+    "navn": "bookingerV1"
+  },
+  {
+    "fil": "src/middleware/auth.js",
+    "tittel": "basic auth-fallback",
+    "dom": "la_staa",
+    "nekrolog": "Basic-auth-grenen sover i en if som aldri er sann i produksjon. Men det er autentisering, og noen kan bruke den lokalt. «Sa vi» er ikke bevis.",
+    "begrunnelse": "Sannsynligvis ubrukt i drift, men det er sikkerhetskritisk kode og kan være i bruk lokalt. Ikke begrav uten å spørre dem som kjører lokalt.",
+    "sok": "brukLdap",
+    "navn": "autentiser"
+  },
+  {
+    "fil": "test/varsling.test.js",
+    "tittel": "it.skip: SMS-påminnelse",
+    "dom": "begrav",
+    "nekrolog": "Her hviler «sender SMS-påminnelse» (2021–2021). Aldri kjørt, aldri fylt ut, og funksjonen den skulle teste ble aldri skrevet.",
+    "begrunnelse": "Tom test som venter på en funksjon som ikke finnes. Ingenting å dekke.",
+    "sok": "it.skip",
+    "navn": "sendSms"
+  },
+  {
+    "fil": "test/bookingService.test.js",
+    "tittel": "it.skip: sommertid",
+    "dom": "la_staa",
+    "nekrolog": "Denne skal ikke begraves. Den er ikke død, den er bevisstløs. Testen feiler fordi det finnes en reell feil, og å slette den fjerner varslingen, ikke feilen.",
+    "begrunnelse": "En skippet test som avslører en ekte feil. Å slette den skjuler feilen. Fiks bugen eller skriv en sak, ikke grav.",
+    "sok": "sommertid",
+    "navn": "opprettBooking"
+  }
+]

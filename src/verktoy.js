@@ -13,9 +13,18 @@ tester som alltid skippes og feature-flagg som aldri endres.
 Undersøk før du konkluderer: finn noe mistenkelig, sjekk om noe bruker det, og gå videre.
 For hvert funn skriver du en kort nekrolog: hva det var, når det sist ble rørt, og hvorfor
 det trygt kan begraves. Si tydelig fra når du er usikker, og si hva som IKKE bør fjernes.
+Husk at kode kan brukes indirekte: via strenger i config, dynamisk import, npm-scripts eller fra
+andre repoer. Null treff betyr ikke alltid at noe er dødt.
+
+Hver gang du har konkludert om noe, kaller du registrer_funn. Gjør det både for det som trygt kan
+begraves (dom «begrav») og for det som ser dødt ut men lever eller bør undersøkes av et menneske
+først (dom «la_staa»). Registrer funnene underveis, ikke alle til slutt.
+Når du er ferdig, svarer du med en kort oppsummering.
 Svar på norsk.`;
 
-export const eksempelOppgave = 'Finn død kode i hjemsokt-repo og skriv en nekrolog for det tryggeste funnet.';
+export const eksempelOppgave =
+  'Gå gjennom hele hjemsokt-repo. Finn død kode og registrer hvert funn med registrer_funn: ' +
+  'både det som kan begraves og det som ser dødt ut, men lever.';
 
 const MAKS_TREFF = 50;
 
@@ -139,6 +148,29 @@ function hentGitHistorikk({ fil } = {}) {
     .join('\n');
 }
 
+// Liste over alle filer i repoet (relative stier). Brukes av web-visningen til å tegne kirkegården.
+export function repoFiler() {
+  return alleFiler(REPO)
+    .map((f) => path.relative(REPO, f).split(path.sep).join('/'))
+    .sort()
+    .map((fil) => ({ fil, linjer: fs.readFileSync(path.join(REPO, fil), 'utf8').split('\n').length }));
+}
+
+// Funnene agenten leverer. Web-visningen tegner dem som begravelser eller lykter.
+function registrerFunn(input, ctx) {
+  const { fil, tittel, dom, nekrolog, begrunnelse } = input ?? {};
+  const full = repoSti(fil);
+  if (!fs.existsSync(full) || !fs.statSync(full).isFile()) {
+    throw new Error(`Fant ikke fila «${fil}». Gi stien relativt til roten av hjemsokt-repo.`);
+  }
+  if (!['begrav', 'la_staa'].includes(dom)) throw new Error('«dom» må være «begrav» eller «la_staa».');
+  for (const [k, v] of Object.entries({ tittel, nekrolog, begrunnelse })) {
+    if (typeof v !== 'string' || !v.trim()) throw new Error(`Mangler «${k}».`);
+  }
+  ctx.funn.push({ fil, tittel, dom });
+  return `Funn nr. ${ctx.funn.length} registrert: ${tittel} (${dom}).`;
+}
+
 export const verktøy = [
   {
     definisjon: {
@@ -211,5 +243,26 @@ export const verktøy = [
       },
     },
     kjør: async (input) => hentGitHistorikk(input),
+  },
+  {
+    definisjon: {
+      name: 'registrer_funn',
+      description:
+        'Registrerer ett ferdig undersøkt funn. Kall dette når du har konkludert om noe, både for det som ' +
+        'trygt kan begraves (dom "begrav") og for det som ser dødt ut men lever eller trenger en ' +
+        'menneskelig avgjørelse (dom "la_staa"). Ett kall per funn. Én fil kan ha flere funn.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          fil: { type: 'string', description: 'Fila funnet ligger i, relativt til hjemsokt-repo.' },
+          tittel: { type: 'string', description: 'Kort navn på det som er funnet, f.eks. «beregnRabatt».' },
+          dom: { type: 'string', enum: ['begrav', 'la_staa'], description: 'begrav = trygt å fjerne. la_staa = lever, eller må avklares først.' },
+          nekrolog: { type: 'string', description: 'To–tre setninger: hva det var, når det sist ble rørt, hvorfor det kan begraves (eller ikke).' },
+          begrunnelse: { type: 'string', description: 'Én setning med beviset: hva du sjekket og hva du fant.' },
+        },
+        required: ['fil', 'tittel', 'dom', 'nekrolog', 'begrunnelse'],
+      },
+    },
+    kjør: async (input, ctx) => registrerFunn(input, ctx),
   },
 ];

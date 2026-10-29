@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kodekirkegården</title>
+<style>
+  :root { --bg:#0b0816; --panel:#14102a; --line:#2b2350; --ink:#e8e2ff; --dim:#9a90c8; --acc:#ff9a2e; --ok:#6ee7a0; --bad:#ff6b7a; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; min-height:100%; background:var(--bg); color:var(--ink); font:14px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  #app { display:flex; gap:12px; padding:12px; max-width:1400px; margin:0 auto; align-items:flex-start; }
+  #stage { position:relative; flex:1 1 auto; min-width:0; }
+  canvas { width:100%; aspect-ratio: 960 / 660; display:block; border:1px solid var(--line); border-radius:8px; background:#0e0a20; }
+  #side { flex:0 0 380px; display:flex; flex-direction:column; gap:10px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+  h1 { margin:0; font-size:18px; color:var(--acc); }
+  .badge { display:inline-block; font-size:11px; padding:1px 8px; border-radius:10px; border:1px solid var(--line); margin-left:6px; vertical-align:middle; }
+  .badge.live { color:var(--ok); border-color:var(--ok); } .badge.demo { color:#ffd27a; border-color:#ffd27a; } .badge.idle { color:var(--dim); }
+  .stats { display:flex; justify-content:space-between; margin-top:8px; }
+  .stat b { display:block; font-size:18px; } .stat span { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.8px; }
+  textarea { width:100%; background:#0e0a20; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; font-size:12px; resize:vertical; }
+  .row { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+  button { font:inherit; color:var(--ink); background:#1f1840; border:1px solid var(--line); border-radius:6px; padding:6px 10px; cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--acc); } button:disabled { opacity:.4; cursor:default; }
+  button.primary { background:var(--acc); color:#1a1020; font-weight:bold; border-color:var(--acc); }
+  button.sel { border-color:var(--acc); }
+  #focus h2 { margin:0; font-size:14px; word-break:break-all; } #focus .sub { color:var(--dim); font-size:12px; margin-bottom:6px; word-break:break-all; }
+  .ev { font-size:12px; max-height:220px; overflow:auto; } .ev .t { color:var(--acc); margin-top:4px; }
+  .ev .l { color:#cfc8f5; padding-left:8px; white-space:pre-wrap; word-break:break-all; } .ev .l.err { color:var(--bad); }
+  .obit { margin-top:8px; padding:8px; border-left:3px solid var(--ok); background:#0f1f1a; font-size:12px; font-style:italic; }
+  .obit.bury { border-color:#ffb27a; background:#241a12; }
+  #log { height:230px; overflow:auto; font-size:12px; } #log div { margin-bottom:3px; word-break:break-word; }
+  #log .tool { color:#9bd1ff; } #log .agent { color:#ffd27a; } #log .good { color:var(--ok); } #log .bad { color:var(--bad); } #log .dim { color:var(--dim); }
+  .hint { color:var(--dim); font-size:11px; }
+  #overlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(8,5,20,.85); border-radius:8px; padding:20px; }
+  #overlay.show { display:flex; } #overlay .box { max-width:660px; max-height:100%; overflow:auto; }
+  #overlay h2 { color:var(--acc); font-size:26px; margin:0 0 8px; text-align:center; } #overlay p { margin:6px 0; color:#d8d1fa; } #overlay ul { font-size:12px; color:#cfc8f5; padding-left:18px; }
+  @media (max-width: 1000px) { #app { flex-direction:column; } #side { flex-basis:auto; width:100%; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div id="overlay"><div class="box" id="overlayBox"></div></div>
+  </div>
+  <aside id="side">
+    <div class="card">
+      <h1>🪦 Kodekirkegården <span class="badge idle" id="badge">klar</span></h1>
+      <div class="stats">
+        <div class="stat"><b id="sBury">0</b><span>Begravd</span></div>
+        <div class="stat"><b id="sKeep">0</b><span>Lever</span></div>
+        <div class="stat"><b id="sCalls">0</b><span>Verktøykall</span></div>
+        <div class="stat"><b id="sIter">0</b><span>Runder</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <textarea id="oppgave" rows="3"></textarea>
+      <div class="row">
+        <button class="primary" id="bLive">▶ Start agenten (Claude)</button>
+        <button id="bDemo" title="Manus uten AI. Verktøyene kjører likevel mot ekte kode.">▶ Demo uten nøkkel</button>
+      </div>
+      <div class="row">
+        <button id="bPause">⏸ Pause</button>
+        <button data-sp="1" class="sel">×1</button><button data-sp="2">×2</button><button data-sp="4">×4</button>
+        <button id="bStop">■ Stopp</button>
+      </div>
+      <div class="hint" id="status" style="margin-top:6px"></div>
+    </div>
+    <div class="card" id="focus"></div>
+    <div class="card" id="log"></div>
+  </aside>
+</div>
+
+<script>
+const W = 960, H = 660;
+const canvas = document.getElementById('c'), ctx = canvas.getContext('2d');
+const dark = document.createElement('canvas'); dark.width = W; dark.height = H; const dctx = dark.getContext('2d');
+const dpr = Math.min(window.devicePixelRatio || 1, 2);
+canvas.width = W * dpr; canvas.height = H * dpr;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const rng = (seed) => () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+const rand = rng(1337);
+
+const TOOLS = {
+  sok_i_repo: '🔍', les_fil: '📖', finn_referanser: '🔗', hent_git_historikk: '🕰', registrer_funn: '📜',
+};
+
+const stars = Array.from({ length: 90 }, () => ({ x: rand() * W, y: rand() * 40, r: rand() * 1.2 + .3, p: rand() * 6 }));
+const wisps = Array.from({ length: 14 }, () => ({ x: rand() * W, y: rand() * H, p: rand() * 6 }));
+const bats = Array.from({ length: 3 }, (_, i) => ({ x: rand() * W, y: 60 + rand() * 300, p: i * 2, dir: i % 2 ? 1 : -1 }));
+const fogs = Array.from({ length: 6 }, () => ({ x: rand() * W, y: 100 + rand() * 520, w: 180 + rand() * 160, v: 6 + rand() * 8 }));
+
+let zones = [], graves = [], byFile = {}, config = {};
+let agent, queue, cur, es, view, calls, speed = 1, paused = false, phase = 'idle', pulses = [], parts = [], floats = [], t = 0, repoNavn = 'hjemsokt-repo';
+let counts = { bury: 0, keep: 0, calls: 0, iter: 0 }, finished = false, summary = null, callInfo = {};
+
+// ---------------------------------------------------------------------------
+// Kirkegården bygges av de faktiske filene i repoet (GET /api/repo)
+// ---------------------------------------------------------------------------
+function buildWorld(filer) {
+  const dirs = {};
+  filer.forEach((f) => { const i = f.fil.lastIndexOf('/'); (dirs[i < 0 ? '.' : f.fil.slice(0, i)] ||= []).push(f); });
+  const names = Object.keys(dirs).sort((a, b) => (a === '.' ? -1 : b === '.' ? 1 : a.localeCompare(b)));
+  const widths = names.map((n) => Math.max(130, 105 * dirs[n].length + 30));
+  // pakk soner i rader
+  let rows = [[]], x = 24;
+  names.forEach((n, i) => { if (x + widths[i] > W - 24 && rows.at(-1).length) { rows.push([]); x = 24; } rows.at(-1).push(i); x += widths[i] + 12; });
+  const rowH = Math.min(185, (H - 48 - 36) / rows.length - 12);
+  zones = []; graves = []; byFile = {};
+  rows.forEach((r, ri) => {
+    let zx = 24;
+    r.forEach((i) => {
+      const z = { id: names[i], label: names[i] === '.' ? '(rot)' : names[i] + '/', x: zx, y: 48 + ri * (rowH + 12), w: widths[i], h: rowH };
+      zones.push(z);
+      dirs[names[i]].forEach((f, k) => {
+        const base = f.fil.split('/').pop();
+        let h = 0; for (const c of f.fil) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+        const g = { file: f.fil, name: base, short: base.length > 18 ? base.slice(0, 17) + '…' : base, lines: f.linjer, style: h % 3,
+          x: z.x + (z.w * (k + 1)) / (dirs[names[i]].length + 1), y: z.y + z.h * 0.5, used: {}, findings: [], hit: 0, ev: [] };
+        graves.push(g); byFile[f.fil] = g;
+      });
+      zx += z.w + 12;
+    });
+  });
+}
+
+function reset() {
+  if (es) { es.close(); es = null; }
+  graves.forEach((g) => { g.used = {}; g.findings = []; g.hit = 0; g.ev = []; });
+  agent = { x: W / 2, y: H - 16, tx: null, ty: null, face: 1, step: 0, bubble: '', bubbleT: 0, tool: '' };
+  queue = []; cur = null; view = null; pulses = []; parts = []; floats = []; callInfo = {};
+  counts = { bury: 0, keep: 0, calls: 0, iter: 0 }; finished = false; summary = null; phase = 'idle';
+  $('log').innerHTML = ''; $('overlay').classList.remove('show');
+  setBadge('idle', 'klar'); hud(); renderFocus();
+  setButtons(false);
+}
+
+function setButtons(running) {
+  $('bLive').disabled = running || !config.harNokkel;
+  $('bDemo').disabled = running;
+  $('bStop').disabled = !running;
+  $('oppgave').disabled = running;
+}
+function setBadge(kind, text) { const b = $('badge'); b.className = 'badge ' + kind; b.textContent = text; }
+function hud() { $('sBury').textContent = counts.bury; $('sKeep').textContent = counts.keep; $('sCalls').textContent = counts.calls; $('sIter').textContent = counts.iter; }
+function log(kind, html) { const el = document.createElement('div'); el.className = kind; el.innerHTML = html; const b = $('log'); b.appendChild(el); while (b.children.length > 120) b.removeChild(b.firstChild); b.scrollTop = b.scrollHeight; }
+
+// ---------------------------------------------------------------------------
+// Koble til backend: hendelser fra agenten kommer som Server-Sent Events
+// ---------------------------------------------------------------------------
+function start(modus) {
+  reset();
+  phase = 'running'; setButtons(true);
+  setBadge(modus === 'live' ? 'live' : 'demo', modus === 'live' ? 'LIVE · Claude' : 'DEMO · manus, ikke AI');
+  log('dim', modus === 'live' ? 'Kobler til backend og Claude …' : 'Demo: manus spilles av. Verktøyene kjører likevel mot ekte kode.');
+  es = new EventSource('/api/run?modus=' + modus + '&oppgave=' + encodeURIComponent($('oppgave').value));
+  let streamEnd = false;
+  es.onmessage = (e) => { const ev = JSON.parse(e.data); if (ev.type === 'ferdig' || ev.type === 'feil') streamEnd = true; queue.push(ev); };
+  es.onerror = () => {
+    if (streamEnd || finished || !es) { if (es) { es.close(); es = null; } return; }
+    es.close(); es = null;
+    queue.push({ type: 'feil', melding: 'Mistet kontakten med backend (eller den avviste kjøringen, f.eks. fordi en agent allerede kjører).' });
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Hendelseskø: hver hendelse animeres ferdig før den neste vises
+// ---------------------------------------------------------------------------
+function lines(txt, n) { const l = String(txt).split('\n'); return l.slice(0, n).concat(l.length > n ? [`… ${l.length - n} linjer til`] : []); }
+function argText(inp) { const v = inp.fil ?? inp.monster ?? inp.navn ?? ''; return String(v); }
+
+function begin(ev) {
+  cur = { ev, stage: 'dwell', time: .6 };
+  const g = ev.fil ? byFile[ev.fil] : ev.input?.fil ? byFile[ev.input.fil] : null;
+  switch (ev.type) {
+    case 'start': log('dim', `Modell: <b>${esc(ev.modell)}</b> · maks ${ev.maks} runder`); log('agent', `📋 ${esc(ev.oppgave)}`); cur.time = .4; break;
+    case 'tanke': agent.bubble = ev.tekst.length > 200 ? ev.tekst.slice(0, 197) + '…' : ev.tekst; agent.bubbleT = 5; log('agent', `🕯 ${esc(ev.tekst)}`); cur.time = Math.min(3, Math.max(1.1, ev.tekst.length / 70)); counts.iter++; hud(); break;
+    case 'kall': {
+      counts.calls++; hud(); agent.tool = TOOLS[ev.navn] || '🔧';
+      callInfo[ev.id] = { navn: ev.navn, input: ev.input, g };
+      log('tool', `${agent.tool} <b>${esc(ev.navn)}</b>(${esc(JSON.stringify(ev.input).slice(0, 110))})`);
+      if (g) { g.used[ev.navn] = true; walkTo(g); cur.stage = 'walk'; cur.time = .5; }
+      else { pulses.push({ x: agent.x, y: agent.y, r: 6, life: 1 }); cur.time = .5; }
+      view = { title: g ? g.file : ev.navn === 'registrer_funn' ? 'registrerer funn' : 'søker i repoet', sub: `${ev.navn} ${argText(ev.input)}`, blocks: [], obit: null };
+      renderFocus(); break;
+    }
+    case 'svar': {
+      const info = callInfo[ev.id] || {};
+      const l = lines(ev.tekst, 14);
+      log(ev.feil ? 'bad' : 'dim', `   ↳ ${ev.feil ? '✖ ' : ''}${esc(l[0] ?? '')}${l.length > 1 ? ` <span class="hint">(+${String(ev.tekst).split('\n').length - 1} linjer)</span>` : ''}`);
+      if (view && !(info.navn === 'registrer_funn')) { view.blocks = [{ head: `${TOOLS[ev.navn] || ''} ${ev.navn}`, lines: l, err: ev.feil }]; renderFocus(); }
+      (ev.filer || []).forEach((f) => { if (byFile[f]) { byFile[f].hit = 3; pulses.push({ x: byFile[f].x, y: byFile[f].y, r: 4, life: 1 }); } });
+      cur.time = ev.filer?.length ? 1.2 : .8; break;
+    }
+    case 'funn': {
+      const gg = byFile[ev.fil]; if (!gg) { cur.time = .1; break; }
+      walkTo(gg); cur.stage = 'walk'; cur.time = 1.8; break;
+    }
+    case 'ferdig': counts.iter = ev.iterasjoner ?? counts.iter; hud(); finished = true; summary = ev; cur.time = 1.2; break;
+    case 'feil': finished = true; log('bad', `✖ ${esc(ev.melding)}`); summary = { feil: ev.melding }; cur.time = .8; break;
+  }
+}
+
+function arrived() {
+  const ev = cur.ev;
+  if (ev.type === 'funn') {
+    const g = byFile[ev.fil];
+    g.findings.push({ tittel: ev.tittel, dom: ev.dom, nekrolog: ev.nekrolog, begrunnelse: ev.begrunnelse });
+    const bury = ev.dom === 'begrav'; counts[bury ? 'bury' : 'keep']++; hud();
+    floats.push({ x: g.x, y: g.y - 40, text: bury ? '⚰ BEGRAVD' : '🕯 LEVER', color: bury ? '#ffb27a' : '#6ee7a0', life: 1.8 });
+    for (let i = 0; i < 18; i++) parts.push({ x: g.x, y: g.y + 12, vx: (Math.random() - .5) * 110, vy: -Math.random() * 110, life: .9, c: bury ? '#6a4a30' : '#6ee7a0' });
+    log(bury ? 'good' : 'good', `${bury ? '⚰️ Begravet' : '🕯 Står igjen'}: <b>${esc(ev.tittel)}</b> <span class="hint">(${esc(ev.fil)})</span>`);
+    log('agent', `📜 ${esc(ev.nekrolog)}`);
+    view = { title: ev.tittel, sub: ev.fil, blocks: [{ head: '📜 begrunnelse', lines: [ev.begrunnelse] }], obit: { text: ev.nekrolog, bury } };
+    renderFocus();
+  }
+  cur.stage = 'dwell';
+}
+
+function end() {
+  const ev = cur.ev; cur = null;
+  if (ev.type === 'ferdig' || ev.type === 'feil') { phase = 'done'; setButtons(false); if (es) { es.close(); es = null; } showReport(); }
+}
+
+function showReport() {
+  const all = graves.flatMap((g) => g.findings.map((f) => ({ ...f, fil: g.file })));
+  const buried = all.filter((f) => f.dom === 'begrav'), kept = all.filter((f) => f.dom === 'la_staa');
+  const s = summary || {};
+  $('overlayBox').innerHTML = `<h2>Obduksjonsrapport</h2>
+    ${s.feil ? `<p style="color:var(--bad)">✖ ${esc(s.feil)}</p>` : ''}
+    ${s.advarsel ? `<p style="color:var(--bad)">⚠ ${esc(s.advarsel)}</p>` : ''}
+    <p><b>${buried.length}</b> kan begraves · <b>${kept.length}</b> ser døde ut, men lever · ${counts.calls} verktøykall · ${counts.iter} runder</p>
+    ${s.sammendrag ? `<p><i>${esc(s.sammendrag)}</i></p>` : ''}
+    ${buried.length ? `<p><b>Kan begraves:</b></p><ul>${buried.map((f) => `<li>⚰️ <b>${esc(f.tittel)}</b> <span class="hint">${esc(f.fil)}</span><br>${esc(f.begrunnelse)}</li>`).join('')}</ul>` : ''}
+    ${kept.length ? `<p><b>Skal ikke fjernes (uten å spørre):</b></p><ul>${kept.map((f) => `<li>🕯 <b>${esc(f.tittel)}</b> <span class="hint">${esc(f.fil)}</span><br>${esc(f.begrunnelse)}</li>`).join('')}</ul>` : ''}
+    <p class="hint">Agentens vurderinger må kontrolleres av et menneske før noe slettes.</p>
+    <div class="row" style="justify-content:center"><button class="primary" id="close">Lukk</button></div>`;
+  $('overlay').classList.add('show'); $('close').onclick = () => $('overlay').classList.remove('show');
+}
+
+function renderFocus() {
+  const el = $('focus');
+  if (!view) { el.innerHTML = `<div class="hint" style="font-size:13px">${phase === 'idle' ? `Hver gravstein er en ekte fil i <b>${esc(repoNavn)}</b>. Start agenten og se den undersøke dem.` : 'Agenten tenker …'}</div>`; return; }
+  let h = `<h2>${esc(view.title)}</h2><div class="sub">${esc(view.sub)}</div><div class="ev">`;
+  view.blocks.forEach((b) => { h += `<div class="t">${esc(b.head)}</div>` + b.lines.map((l) => `<div class="l ${b.err ? 'err' : ''}">${esc(l)}</div>`).join(''); });
+  h += '</div>';
+  if (view.obit) h += `<div class="obit ${view.obit.bury ? 'bury' : ''}">${esc(view.obit.text)}</div>`;
+  el.innerHTML = h;
+}
+
+// ---------------------------------------------------------------------------
+// Oppdatering
+// ---------------------------------------------------------------------------
+const WALK = 170;
+function walkTo(g) { agent.tx = g.x; agent.ty = g.y + 38; }
+
+function update(dt) {
+  t += dt;
+  if (phase !== 'idle') {
+    if (!cur && queue.length) begin(queue.shift());
+    if (cur) {
+      if (cur.stage === 'walk') {
+        const dx = agent.tx - agent.x, dy = agent.ty - agent.y, d = Math.hypot(dx, dy);
+        if (d < 5) { agent.tx = null; arrived(); }
+        else {
+          agent.face = dx < 0 ? -1 : 1; agent.step += dt * 10;
+          agent.x += (dx / d) * WALK * dt; agent.y += (dy / d) * WALK * dt;
+          graves.forEach((g) => { const ddx = agent.x - g.x, ddy = agent.y - g.y, dd = Math.hypot(ddx, ddy); if (dd < 24 && dd > 0 && !(Math.abs(agent.tx - g.x) < 1 && Math.abs(agent.ty - g.y) < 40 && dd > 20)) { agent.x = g.x + ddx / dd * 24; agent.y = g.y + ddy / dd * 24; } });
+        }
+      } else { cur.time -= dt; if (cur.time <= 0) end(); }
+    }
+  }
+  agent.bubbleT = Math.max(0, agent.bubbleT - dt);
+  graves.forEach((g) => { g.hit = Math.max(0, g.hit - dt); });
+  pulses.forEach((p) => { p.life -= dt * .9; p.r += 70 * dt; }); pulses = pulses.filter((p) => p.life > 0);
+  floats.forEach((f) => { f.life -= dt; f.y -= 22 * dt; }); floats = floats.filter((f) => f.life > 0);
+  parts.forEach((p) => { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 260 * dt; }); parts = parts.filter((p) => p.life > 0);
+  bats.forEach((b) => { b.x += b.dir * 40 * dt; if (b.x < -20) b.x = W + 20; if (b.x > W + 20) b.x = -20; });
+  fogs.forEach((f) => { f.x += f.v * dt; if (f.x - f.w > W) f.x = -f.w; });
+}
+
+// ---------------------------------------------------------------------------
+// Tegning
+// ---------------------------------------------------------------------------
+function drawBackground() {
+  const gr = ctx.createLinearGradient(0, 0, 0, H); gr.addColorStop(0, '#171034'); gr.addColorStop(1, '#0c1018');
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+  stars.forEach((s) => { ctx.globalAlpha = .4 + .5 * Math.sin(t * 1.5 + s.p); ctx.fillStyle = '#fff'; ctx.fillRect(s.x, s.y, s.r, s.r); }); ctx.globalAlpha = 1;
+  const mg = ctx.createRadialGradient(920, 22, 3, 920, 22, 50); mg.addColorStop(0, 'rgba(255,240,200,.5)'); mg.addColorStop(1, 'rgba(255,240,200,0)');
+  ctx.fillStyle = mg; ctx.fillRect(860, 0, 100, 80);
+  ctx.fillStyle = '#fff2c8'; ctx.beginPath(); ctx.arc(920, 22, 12, 0, 7); ctx.fill();
+  ctx.fillStyle = '#12261c'; for (let i = 0; i < 140; i++) { const r = rng(i * 97 + 3); const x = r() * W, y = 40 + r() * (H - 40); ctx.fillRect(x, y, 2, 5); ctx.fillRect(x + 3, y + 1, 2, 4); }
+}
+function drawZone(z) {
+  ctx.fillStyle = 'rgba(30,22,58,.55)'; ctx.fillRect(z.x, z.y, z.w, z.h);
+  ctx.strokeStyle = '#4a3d82'; ctx.lineWidth = 2; ctx.strokeRect(z.x, z.y, z.w, z.h);
+  ctx.fillStyle = '#4a3d82'; for (let x = z.x; x <= z.x + z.w; x += 12) { ctx.fillRect(x - 1, z.y - 6, 2, 6); ctx.fillRect(x - 1, z.y + z.h, 2, 5); }
+  ctx.fillStyle = '#bdb1ee'; ctx.font = 'bold 11px ui-monospace, monospace'; ctx.textAlign = 'left'; ctx.fillText('📁 ' + z.label, z.x + 8, z.y + 16);
+}
+function stonePath(style, x, y) {
+  ctx.beginPath();
+  if (style === 1) { ctx.rect(x - 4, y - 24, 8, 40); ctx.rect(x - 14, y - 14, 28, 8); }
+  else if (style === 2) { ctx.moveTo(x - 11, y + 16); ctx.lineTo(x - 8, y - 18); ctx.lineTo(x, y - 28); ctx.lineTo(x + 8, y - 18); ctx.lineTo(x + 11, y + 16); ctx.closePath(); }
+  else { ctx.moveTo(x - 14, y + 16); ctx.lineTo(x - 14, y - 8); ctx.arc(x, y - 8, 14, Math.PI, 0); ctx.lineTo(x + 14, y + 16); ctx.closePath(); }
+}
+function drawGrave(g) {
+  const { x, y } = g, keepN = g.findings.filter((f) => f.dom === 'la_staa').length, buryN = g.findings.length - keepN;
+  ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.beginPath(); ctx.ellipse(x, y + 17, 20, 6, 0, 0, 7); ctx.fill();
+  if (g.hit > 0) { const a = Math.min(1, g.hit) * .5; const gl = ctx.createRadialGradient(x, y, 4, x, y, 50); gl.addColorStop(0, `rgba(255,190,90,${a})`); gl.addColorStop(1, 'rgba(255,190,90,0)'); ctx.fillStyle = gl; ctx.fillRect(x - 50, y - 50, 100, 100); }
+  if (keepN === 0 && buryN > 0) {
+    ctx.fillStyle = '#4a3422'; ctx.beginPath(); ctx.ellipse(x, y + 10, 22, 11, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#6a4a30'; ctx.beginPath(); ctx.ellipse(x, y + 7, 17, 7, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.fillRect(x - 1, y - 6, 2, 12); ctx.fillStyle = '#ff9a2e'; ctx.beginPath(); ctx.arc(x, y - 8, 3.5, 0, 7); ctx.fill();
+  } else {
+    if (keepN) { const gl = ctx.createRadialGradient(x, y, 4, x, y, 44); gl.addColorStop(0, 'rgba(110,231,160,.45)'); gl.addColorStop(1, 'rgba(110,231,160,0)'); ctx.fillStyle = gl; ctx.fillRect(x - 46, y - 46, 92, 92); }
+    stonePath(g.style, x, y);
+    const seen = Object.keys(g.used).length > 0;
+    ctx.fillStyle = keepN ? '#9fb8aa' : seen ? '#a39dc0' : '#7d7899'; ctx.fill(); ctx.strokeStyle = '#2a2444'; ctx.lineWidth = 2; ctx.stroke();
+    if (g.style === 0) { ctx.fillStyle = '#5b5678'; ctx.font = 'bold 9px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.fillText('R.I.P', x, y - 3); }
+    if (buryN && keepN) { ctx.fillStyle = '#ffb27a'; ctx.beginPath(); ctx.arc(x + 14, y + 12, 4, 0, 7); ctx.fill(); }
+  }
+  ctx.textAlign = 'center'; ctx.fillStyle = cur?.ev && (cur.ev.fil === g.file || cur.ev.input?.fil === g.file) ? '#ffd27a' : '#bdb1ee'; ctx.font = '10px ui-monospace, monospace'; ctx.fillText(g.short, x, y + 31);
+  const used = Object.keys(g.used).map((k) => TOOLS[k]).join('') + (keepN ? '🕯'.repeat(keepN) : '') + (buryN ? '⚰'.repeat(buryN) : '');
+  if (used) { ctx.font = '9px sans-serif'; ctx.fillText(used, x, y + 43); }
+}
+function drawAgent() {
+  const { x, y } = agent, bob = Math.sin(agent.step) * 1.5;
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.ellipse(x, y + 12, 11, 4, 0, 0, 7); ctx.fill();
+  ctx.save(); ctx.translate(x, y + bob); ctx.scale(agent.face, 1);
+  ctx.fillStyle = '#2a2140'; ctx.beginPath(); ctx.moveTo(-9, 12); ctx.lineTo(-6, -6); ctx.lineTo(6, -6); ctx.lineTo(9, 12); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#e8d9c0'; ctx.beginPath(); ctx.arc(0, -11, 6, 0, 7); ctx.fill();
+  ctx.fillStyle = '#1a1230'; ctx.fillRect(-9, -15, 18, 3); ctx.fillRect(-5, -23, 10, 9);
+  ctx.fillStyle = '#111'; ctx.fillRect(2, -12, 2, 2);
+  ctx.strokeStyle = '#8a6a3a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(8, 10); ctx.lineTo(14, -10); ctx.stroke();
+  ctx.fillStyle = '#9aa'; ctx.fillRect(11, 8, 8, 5);
+  ctx.fillStyle = '#ffb347'; ctx.fillRect(-14, -2, 5, 7); ctx.fillStyle = '#ffe9a8'; ctx.fillRect(-13, 0, 3, 3);
+  ctx.restore();
+  ctx.textAlign = 'center'; ctx.fillStyle = '#ffd27a'; ctx.font = '10px ui-monospace, monospace'; ctx.fillText('AGENT ' + (phase === 'running' ? agent.tool : ''), x, y - 30);
+  if (agent.bubbleT > 0 && agent.bubble) drawBubble(x, y - 44, agent.bubble);
+}
+function drawBubble(x, y, text) {
+  ctx.font = '11px ui-monospace, monospace'; const maxW = 260, words = text.split(' '), ls = []; let l = '';
+  words.forEach((w) => { if (ctx.measureText(l + w).width > maxW) { ls.push(l); l = ''; } l += w + ' '; }); ls.push(l);
+  const shown = ls.slice(0, 4), w = Math.min(maxW, Math.max(...shown.map((s) => ctx.measureText(s).width))) + 16, h = shown.length * 14 + 10;
+  const bx = Math.max(4, Math.min(W - w - 4, x - w / 2)), by = Math.max(4, y - h);
+  ctx.fillStyle = 'rgba(20,14,44,.94)'; ctx.strokeStyle = '#ffd27a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.roundRect(bx, by, w, h, 6); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#f4ecd0'; ctx.textAlign = 'left'; shown.forEach((s, i) => ctx.fillText(s, bx + 8, by + 15 + i * 14));
+}
+function drawDarkness() {
+  dctx.globalCompositeOperation = 'source-over'; dctx.clearRect(0, 0, W, H); dctx.fillStyle = 'rgba(5,3,16,.5)'; dctx.fillRect(0, 0, W, H);
+  dctx.globalCompositeOperation = 'destination-out';
+  const hole = (x, y, r, a) => { const g = dctx.createRadialGradient(x, y, r * .15, x, y, r); g.addColorStop(0, `rgba(0,0,0,${a})`); g.addColorStop(1, 'rgba(0,0,0,0)'); dctx.fillStyle = g; dctx.fillRect(x - r, y - r, r * 2, r * 2); };
+  hole(agent.x, agent.y, 230 + Math.sin(t * 7) * 5, 1);
+  graves.forEach((g) => { if (g.findings.some((f) => f.dom === 'la_staa')) hole(g.x, g.y, 60, .8); else hole(g.x, g.y, 40, .4); });
+  ctx.drawImage(dark, 0, 0, W, H);
+}
+function draw() {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+  drawBackground(); zones.forEach(drawZone); [...graves].sort((a, b) => a.y - b.y).forEach(drawGrave);
+  pulses.forEach((p) => { ctx.strokeStyle = `rgba(155,209,255,${Math.max(0, p.life) * .7})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.stroke(); });
+  drawAgent();
+  wisps.forEach((w) => { const x = w.x + Math.sin(t * .6 + w.p) * 30, y = w.y + Math.cos(t * .5 + w.p) * 20; ctx.fillStyle = `rgba(130,255,200,${.25 + .2 * Math.sin(t * 2 + w.p)})`; ctx.beginPath(); ctx.arc(x, y, 2.2, 0, 7); ctx.fill(); });
+  bats.forEach((b) => { const f = Math.sin(t * 14 + b.p) * 5, y = b.y + Math.sin(t + b.p) * 20; ctx.fillStyle = '#05030c'; ctx.beginPath(); ctx.moveTo(b.x, y); ctx.lineTo(b.x - 9, y - f); ctx.lineTo(b.x - 4, y + 3); ctx.lineTo(b.x + 4, y + 3); ctx.lineTo(b.x + 9, y - f); ctx.closePath(); ctx.fill(); });
+  fogs.forEach((f) => { const g = ctx.createRadialGradient(f.x, f.y, 5, f.x, f.y, f.w); g.addColorStop(0, 'rgba(190,180,230,.08)'); g.addColorStop(1, 'rgba(190,180,230,0)'); ctx.fillStyle = g; ctx.fillRect(f.x - f.w, f.y - f.w * .4, f.w * 2, f.w * .8); });
+  drawDarkness();
+  parts.forEach((p) => { ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c; ctx.fillRect(p.x, p.y, 3, 3); }); ctx.globalAlpha = 1;
+  floats.forEach((f) => { ctx.globalAlpha = Math.min(1, f.life); ctx.fillStyle = f.color; ctx.font = 'bold 15px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.fillText(f.text, f.x, f.y); }); ctx.globalAlpha = 1;
+  if (phase === 'idle') { ctx.fillStyle = 'rgba(8,5,20,.7)'; ctx.fillRect(W / 2 - 230, H - 62, 460, 28); ctx.fillStyle = '#ffd27a'; ctx.font = '13px ui-monospace, monospace'; ctx.textAlign = 'center'; ctx.fillText('Trykk «Start agenten» for å åpne porten', W / 2, H - 43); }
+}
+
+let last = performance.now();
+function loop(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!paused) for (let i = 0; i < speed; i++) update(dt);
+  draw(); requestAnimationFrame(loop);
+}
+
+// ---------------------------------------------------------------------------
+// Kontroller og oppstart
+// ---------------------------------------------------------------------------
+$('bLive').onclick = () => start('live');
+$('bDemo').onclick = () => start('demo');
+$('bStop').onclick = () => { if (es) { es.close(); es = null; } finished = true; queue = []; cur = null; phase = 'done'; setButtons(false); setBadge('idle', 'stoppet'); log('bad', '■ Stoppet. Backend avbryter agenten når forbindelsen lukkes.'); };
+$('bPause').onclick = (e) => { paused = !paused; e.target.textContent = paused ? '▶ Fortsett' : '⏸ Pause'; };
+document.querySelectorAll('[data-sp]').forEach((b) => (b.onclick = () => { speed = Number(b.dataset.sp); document.querySelectorAll('[data-sp]').forEach((x) => x.classList.toggle('sel', x === b)); }));
+addEventListener('keydown', (e) => { if (e.key === ' ' && e.target.tagName !== 'TEXTAREA') { e.preventDefault(); $('bPause').click(); } });
+
+(async function init() {
+  try {
+    const [status, repo] = await Promise.all([fetch('/api/status').then((r) => r.json()), fetch('/api/repo').then((r) => r.json())]);
+    config = status; repoNavn = repo.navn; buildWorld(repo.filer);
+    $('oppgave').value = status.oppgave;
+    $('status').textContent = status.harNokkel ? `Live-modus klar (${status.modell}, maks ${status.maksIterasjoner} runder).` : 'Ingen ANTHROPIC_API_KEY på serveren. Lag .env (se .env.example) og start på nytt for live-modus. Demo-modus virker uten.';
+  } catch (e) {
+    config = { harNokkel: false }; $('status').textContent = 'Fant ikke backend. Start den med «npm run web» og åpne http://127.0.0.1:3000.';
+    buildWorld([]);
+  }
+  reset(); requestAnimationFrame(loop);
+  window.__k = { get graves() { return graves; }, get counts() { return counts; }, get phase() { return phase; }, start };
+})();
+</script>
+</body>
+</html>
